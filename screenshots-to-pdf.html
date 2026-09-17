@@ -1,0 +1,717 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Screenshots to PDF</title>
+<style>
+  :root{
+    --paper:#faf9f6;
+    --surface:#ffffff;
+    --surface-2:#f2f1ec;
+    --ink:#171a17;
+    --ink-2:#5c625b;
+    --ink-3:#8a908a;
+    --line:#dedcd4;
+    --line-2:#c9c7be;
+    --accent:#1f6f5c;
+    --accent-ink:#ffffff;
+    --accent-soft:#e4efea;
+    --danger:#a33a2b;
+    --radius:10px;
+    color-scheme:light;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --paper:#111412;
+      --surface:#191d1b;
+      --surface-2:#212624;
+      --ink:#e9ece8;
+      --ink-2:#a3aba5;
+      --ink-3:#757d77;
+      --line:#2c322f;
+      --line-2:#3c433f;
+      --accent:#4fbf9f;
+      --accent-ink:#0d1210;
+      --accent-soft:#1c2a26;
+      --danger:#e0806f;
+      color-scheme:dark;
+    }
+  }
+
+  *{box-sizing:border-box}
+  [hidden]{display:none!important}   /* an explicit display: would otherwise win */
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font:15px/1.5 ui-sans-serif,-apple-system,"SF Pro Text","Helvetica Neue",Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;
+    padding:0 20px 120px;
+  }
+  .wrap{max-width:880px;margin:0 auto}
+
+  header{padding:44px 0 26px}
+  .eyebrow{
+    font:600 11px/1 ui-monospace,"SF Mono",Menlo,monospace;
+    letter-spacing:.14em;text-transform:uppercase;color:var(--accent);
+    display:flex;align-items:center;gap:8px;margin:0 0 14px;
+  }
+  .eyebrow::after{content:"";flex:1;height:1px;background:var(--line)}
+  h1{font-size:30px;line-height:1.15;letter-spacing:-.02em;margin:0 0 8px;text-wrap:balance;font-weight:650}
+  .sub{margin:0;color:var(--ink-2);max-width:56ch}
+
+  /* ---- drop zone ---- */
+  .drop{
+    margin-top:26px;border:1.5px dashed var(--line-2);border-radius:var(--radius);
+    background:var(--surface);padding:34px 20px;text-align:center;cursor:pointer;
+    transition:border-color .15s, background .15s, transform .15s;
+  }
+  .drop:hover{border-color:var(--accent)}
+  .drop.hot{border-color:var(--accent);background:var(--accent-soft);transform:scale(1.005)}
+  .drop:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+  .drop strong{display:block;font-size:17px;font-weight:600;margin-bottom:6px}
+  .drop span{color:var(--ink-2);font-size:13.5px}
+  kbd{
+    font:500 12px/1 ui-monospace,"SF Mono",Menlo,monospace;
+    border:1px solid var(--line-2);border-bottom-width:2px;border-radius:5px;
+    padding:2px 5px;background:var(--surface-2);color:var(--ink-2);
+  }
+
+  /* ---- settings ---- */
+  .settings{
+    display:grid;grid-template-columns:1.6fr 1fr 1fr;gap:14px;
+    margin-top:22px;padding:16px;border:1px solid var(--line);
+    border-radius:var(--radius);background:var(--surface);
+  }
+  .field{display:flex;flex-direction:column;gap:6px;min-width:0}
+  label{
+    font:600 10.5px/1 ui-monospace,"SF Mono",Menlo,monospace;
+    letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);
+  }
+  .namebox{display:flex;align-items:center;border:1px solid var(--line-2);border-radius:7px;background:var(--paper);overflow:hidden}
+  .namebox:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+  input[type=text],select{
+    font:inherit;color:var(--ink);background:transparent;border:0;padding:9px 10px;width:100%;min-width:0;
+  }
+  input[type=text]:focus,select:focus{outline:none}
+  .ext{padding:9px 10px 9px 0;color:var(--ink-3);font:500 14px/1.2 ui-monospace,"SF Mono",Menlo,monospace}
+  select{
+    border:1px solid var(--line-2);border-radius:7px;background:var(--paper);
+    appearance:none;padding-right:28px;cursor:pointer;
+    background-image:linear-gradient(45deg,transparent 50%,currentColor 50%),linear-gradient(135deg,currentColor 50%,transparent 50%);
+    background-position:calc(100% - 15px) 50%,calc(100% - 10px) 50%;
+    background-size:5px 5px,5px 5px;background-repeat:no-repeat;
+  }
+  select:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+
+  /* ---- list header ---- */
+  .listbar{display:flex;align-items:baseline;gap:12px;margin:30px 0 12px;flex-wrap:wrap}
+  .listbar h2{font-size:15px;margin:0;font-weight:650;letter-spacing:-.01em}
+  .listbar .hint{color:var(--ink-3);font-size:13px;margin-right:auto}
+  .linkbtn{
+    background:none;border:0;padding:4px 0;color:var(--accent);cursor:pointer;
+    font:600 13px/1 inherit;border-bottom:1px solid transparent;
+  }
+  .linkbtn:hover{border-bottom-color:currentColor}
+  .linkbtn:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:2px}
+
+  /* ---- grid ---- */
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:14px;list-style:none;padding:0;margin:0}
+  .card{
+    border:1px solid var(--line);border-radius:var(--radius);background:var(--surface);
+    overflow:hidden;display:flex;flex-direction:column;position:relative;cursor:grab;
+  }
+  .card.dragging{opacity:.4;cursor:grabbing}
+  .card.over{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+  .card.bad{border-color:var(--danger)}
+  .thumb{
+    aspect-ratio:4/3;max-width:100%;background:var(--surface-2);
+    display:flex;align-items:center;justify-content:center;overflow:hidden;
+    border-bottom:1px solid var(--line);
+  }
+  .thumb img{max-width:100%;max-height:100%;display:block;object-fit:contain}
+  .badge{
+    position:absolute;top:8px;left:8px;min-width:22px;height:22px;padding:0 6px;
+    border-radius:6px;background:var(--accent);color:var(--accent-ink);
+    font:600 12px/22px ui-monospace,"SF Mono",Menlo,monospace;text-align:center;
+    font-variant-numeric:tabular-nums;
+  }
+  .kill{
+    position:absolute;top:8px;right:8px;width:22px;height:22px;border-radius:6px;
+    border:1px solid var(--line-2);background:var(--surface);color:var(--ink-2);
+    font:400 14px/1 system-ui;cursor:pointer;display:flex;align-items:center;justify-content:center;
+  }
+  .kill:hover{background:var(--danger);border-color:var(--danger);color:#fff}
+  .meta{padding:9px 10px;display:flex;flex-direction:column;gap:3px;min-width:0}
+  .fname{font-size:12.5px;font-weight:550;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .dims{font:11.5px/1.3 ui-monospace,"SF Mono",Menlo,monospace;color:var(--ink-3);font-variant-numeric:tabular-nums}
+  .card.bad .dims{color:var(--danger)}
+  .nudge{display:flex;border-top:1px solid var(--line)}
+  .nudge button{
+    flex:1;border:0;background:transparent;color:var(--ink-2);padding:6px;cursor:pointer;
+    font:600 13px/1 system-ui;
+  }
+  .nudge button+button{border-left:1px solid var(--line)}
+  .nudge button:hover:not(:disabled){background:var(--surface-2);color:var(--ink)}
+  .nudge button:disabled{opacity:.3;cursor:default}
+
+  /* ---- action bar ---- */
+  .bar{
+    position:fixed;left:0;right:0;bottom:0;background:var(--surface);
+    border-top:1px solid var(--line);
+    padding:14px 20px calc(14px + env(safe-area-inset-bottom,0px));
+  }
+  .bar .wrap{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+  .status{color:var(--ink-2);font-size:13.5px;margin-right:auto;font-variant-numeric:tabular-nums}
+  .status b{color:var(--ink);font-weight:600}
+  .go{
+    border:0;border-radius:8px;background:var(--accent);color:var(--accent-ink);
+    font:650 15px/1 inherit;padding:12px 22px;cursor:pointer;
+  }
+  .go:disabled{background:var(--surface-2);color:var(--ink-3);cursor:default}
+  .go:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+  a.go{text-decoration:none;display:inline-block;padding:12px 22px}
+
+  @media (max-width:560px){
+    .settings{grid-template-columns:1fr}
+    h1{font-size:25px}
+  }
+  @media (prefers-reduced-motion: reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <p class="eyebrow">Runs offline · nothing is uploaded</p>
+    <h1>Screenshots&nbsp;→&nbsp;PDF</h1>
+    <p class="sub">Drop images in, drag them into the order you want, name the file, save. Every page keeps its original resolution.</p>
+  </header>
+
+  <div class="drop" id="drop" tabindex="0" role="button" aria-label="Add screenshots">
+    <strong>Drop screenshots here</strong>
+    <span>or click to choose files &nbsp;·&nbsp; or press <kbd>⌘V</kbd> to paste one</span>
+  </div>
+  <input type="file" id="picker" accept="image/*" multiple hidden>
+
+  <div class="settings">
+    <div class="field">
+      <label for="fname">File name</label>
+      <div class="namebox">
+        <input type="text" id="fname" spellcheck="false" autocomplete="off">
+        <span class="ext">.pdf</span>
+      </div>
+    </div>
+    <div class="field">
+      <label for="pagesize">Page</label>
+      <select id="pagesize">
+        <option value="fit">Fit to image</option>
+        <option value="a4">A4</option>
+        <option value="letter">US Letter</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="quality">Image</label>
+      <select id="quality">
+        <option value="lossless">Sharp (lossless)</option>
+        <option value="jpeg">Small (compressed)</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="listbar">
+    <h2 id="count">No pages yet</h2>
+    <span class="hint" id="hint">Drag a tile to reorder</span>
+    <button class="linkbtn" id="sortName" hidden>Sort by name</button>
+    <button class="linkbtn" id="clear" hidden>Clear all</button>
+  </div>
+
+  <ul class="grid" id="grid"></ul>
+</div>
+
+<div class="bar">
+  <div class="wrap">
+    <span class="status" id="status">Add at least one screenshot.</span>
+    <button class="go" id="save" disabled>Build PDF</button>
+    <a class="go" id="dl" hidden download>Save</a>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  var items = [];          // {id, name, url, img, w, h, ok}
+  var nextId = 1;
+  var busy = false;
+  var builtUrl = null;     // object URL of the PDF waiting to be saved
+
+  var $ = function (id) { return document.getElementById(id); };
+  var grid = $('grid'), drop = $('drop'), picker = $('picker'),
+      fname = $('fname'), status = $('status'), save = $('save'),
+      count = $('count'), hint = $('hint'), clearBtn = $('clear'), sortBtn = $('sortName'),
+      dl = $('dl');
+
+  // A built PDF goes stale the moment the pages or settings change.
+  function discardBuild() {
+    if (!builtUrl) return;
+    URL.revokeObjectURL(builtUrl);
+    builtUrl = null;
+    dl.hidden = true;
+    dl.removeAttribute('href');
+    save.hidden = false;
+  }
+
+  // Default name: extrato-2026-09-17
+  var today = new Date();
+  var pad = function (n) { return String(n).padStart(2, '0'); };
+  fname.value = 'extrato-' + today.getFullYear() + '-' + pad(today.getMonth() + 1) + '-' + pad(today.getDate());
+
+  /* ---------- adding files ---------- */
+
+  function addFiles(fileList) {
+    var incoming = Array.prototype.slice.call(fileList).filter(function (f) {
+      return f.type.indexOf('image/') === 0 || /\.(png|jpe?g|gif|webp|bmp)$/i.test(f.name);
+    });
+    if (!incoming.length) return;
+
+    // Finder hands files over in an arbitrary order; name order matches
+    // macOS screenshot timestamps, so it is the sanest starting point.
+    incoming.sort(function (a, b) {
+      return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
+    });
+
+    incoming.forEach(function (file) {
+      var item = {
+        id: nextId++,
+        name: file.name || ('pasted-' + nextId + '.png'),
+        url: URL.createObjectURL(file),
+        img: null, w: 0, h: 0, ok: false, failed: false
+      };
+      items.push(item);
+
+      var img = new Image();
+      img.onload = function () {
+        item.img = img; item.w = img.naturalWidth; item.h = img.naturalHeight; item.ok = true;
+        render();
+      };
+      img.onerror = function () { item.ok = false; item.failed = true; render(); };
+      img.src = item.url;
+    });
+    render();
+  }
+
+  drop.addEventListener('click', function () { picker.click(); });
+  drop.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); picker.click(); }
+  });
+  picker.addEventListener('change', function () { addFiles(picker.files); picker.value = ''; });
+
+  function hasFiles(e) {
+    var t = e.dataTransfer && e.dataTransfer.types;
+    return !!t && Array.prototype.indexOf.call(t, 'Files') !== -1;
+  }
+  ['dragenter', 'dragover'].forEach(function (ev) {
+    window.addEventListener(ev, function (e) {
+      if (!hasFiles(e)) return;
+      e.preventDefault(); drop.classList.add('hot');
+    });
+  });
+  window.addEventListener('dragleave', function (e) {
+    if (e.relatedTarget === null) drop.classList.remove('hot');
+  });
+  window.addEventListener('drop', function (e) {
+    if (!hasFiles(e)) return;
+    e.preventDefault(); drop.classList.remove('hot');
+    addFiles(e.dataTransfer.files);
+  });
+  window.addEventListener('paste', function (e) {
+    if (e.clipboardData && e.clipboardData.files && e.clipboardData.files.length) {
+      addFiles(e.clipboardData.files);
+    }
+  });
+
+  /* ---------- reordering ---------- */
+
+  var dragFrom = null;
+
+  function move(from, to) {
+    if (to < 0 || to >= items.length || from === to) return;
+    var moved = items.splice(from, 1)[0];
+    items.splice(to, 0, moved);
+    render();
+  }
+
+  /* ---------- rendering ---------- */
+
+  function render() {
+    discardBuild();
+    grid.textContent = '';
+
+    items.forEach(function (item, i) {
+      var li = document.createElement('li');
+      li.className = 'card' + (item.failed ? ' bad' : '');
+      li.draggable = true;
+
+      var thumb = document.createElement('div');
+      thumb.className = 'thumb';
+      var im = document.createElement('img');
+      im.src = item.url; im.alt = '';
+      thumb.appendChild(im);
+
+      var badge = document.createElement('span');
+      badge.className = 'badge';
+      badge.textContent = i + 1;
+
+      var kill = document.createElement('button');
+      kill.className = 'kill'; kill.type = 'button';
+      kill.setAttribute('aria-label', 'Remove ' + item.name);
+      kill.textContent = '×';
+      kill.addEventListener('click', function (e) {
+        e.stopPropagation();
+        URL.revokeObjectURL(item.url);
+        items.splice(i, 1);
+        render();
+      });
+
+      var meta = document.createElement('div');
+      meta.className = 'meta';
+      var n = document.createElement('div');
+      n.className = 'fname'; n.textContent = item.name; n.title = item.name;
+      var d = document.createElement('div');
+      d.className = 'dims';
+      if (item.ok) { d.textContent = item.w + ' × ' + item.h; }
+      else if (item.failed) { d.textContent = 'can’t read this one'; }
+      else { d.textContent = 'reading…'; }
+      meta.appendChild(n); meta.appendChild(d);
+
+      var nudge = document.createElement('div');
+      nudge.className = 'nudge';
+      var left = document.createElement('button');
+      left.type = 'button'; left.textContent = '‹'; left.title = 'Move earlier';
+      left.setAttribute('aria-label', 'Move ' + item.name + ' earlier');
+      left.disabled = i === 0;
+      left.addEventListener('click', function () { move(i, i - 1); });
+      var right = document.createElement('button');
+      right.type = 'button'; right.textContent = '›'; right.title = 'Move later';
+      right.setAttribute('aria-label', 'Move ' + item.name + ' later');
+      right.disabled = i === items.length - 1;
+      right.addEventListener('click', function () { move(i, i + 1); });
+      nudge.appendChild(left); nudge.appendChild(right);
+
+      li.addEventListener('dragstart', function (e) {
+        dragFrom = i; li.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+        try { e.dataTransfer.setData('text/plain', String(i)); } catch (err) {}
+      });
+      li.addEventListener('dragend', function () {
+        dragFrom = null; li.classList.remove('dragging');
+        Array.prototype.forEach.call(grid.children, function (c) { c.classList.remove('over'); });
+      });
+      li.addEventListener('dragover', function (e) {
+        if (dragFrom === null) return;
+        e.preventDefault(); e.dataTransfer.dropEffect = 'move';
+        li.classList.add('over');
+      });
+      li.addEventListener('dragleave', function () { li.classList.remove('over'); });
+      li.addEventListener('drop', function (e) {
+        if (dragFrom === null) return;
+        e.preventDefault(); e.stopPropagation();
+        li.classList.remove('over');
+        move(dragFrom, i);
+        dragFrom = null;
+      });
+
+      li.appendChild(thumb);
+      li.appendChild(badge);
+      li.appendChild(kill);
+      li.appendChild(meta);
+      li.appendChild(nudge);
+      grid.appendChild(li);
+    });
+
+    var n = items.length;
+    count.textContent = n === 0 ? 'No pages yet' : (n === 1 ? '1 page' : n + ' pages');
+    hint.hidden = n < 2;
+    clearBtn.hidden = n === 0;
+    sortBtn.hidden = n < 2;
+    save.disabled = n === 0 || busy;
+    if (!busy) {
+      status.textContent = n === 0
+        ? 'Add at least one screenshot.'
+        : 'Pages come out in the order shown, top-left to bottom-right.';
+    }
+  }
+
+  clearBtn.addEventListener('click', function () {
+    items.forEach(function (it) { URL.revokeObjectURL(it.url); });
+    items = [];
+    render();
+  });
+  sortBtn.addEventListener('click', function () {
+    items.sort(function (a, b) {
+      return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
+    });
+    render();
+  });
+
+  /* ---------- PDF writing ---------- */
+
+  var PAGES = {
+    a4:     [595.28, 841.89],
+    letter: [612, 792]
+  };
+  var MARGIN = 18;      // points, only used for fixed page sizes
+  var MAX_EDGE = 3200;  // downscale monsters so the file stays mailable
+
+  function toBytes(s) { return new TextEncoder().encode(s); }
+
+  function num(x) { return (Math.round(x * 100) / 100).toString(); }
+
+  // Draw an image onto a canvas over white (drops alpha, which PDF images
+  // would otherwise render as black).
+  function rasterize(img) {
+    var w = img.naturalWidth, h = img.naturalHeight;
+    var scale = Math.min(1, MAX_EDGE / Math.max(w, h));
+    w = Math.max(1, Math.round(w * scale));
+    h = Math.max(1, Math.round(h * scale));
+    var c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    var ctx = c.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, w, h);
+    ctx.drawImage(img, 0, 0, w, h);
+    return c;
+  }
+
+  function deflate(bytes) {
+    // CompressionStream('deflate') emits a zlib stream, which is exactly
+    // what PDF's /FlateDecode expects.
+    var cs = new CompressionStream('deflate');
+    var writer = cs.writable.getWriter();
+    writer.write(bytes);
+    writer.close();
+    return new Response(cs.readable).arrayBuffer().then(function (buf) {
+      return new Uint8Array(buf);
+    });
+  }
+
+  function encodeLossless(canvas) {
+    var ctx = canvas.getContext('2d');
+    var data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+    var rgb = new Uint8Array(canvas.width * canvas.height * 3);
+    for (var i = 0, j = 0; i < data.length; i += 4) {
+      rgb[j++] = data[i]; rgb[j++] = data[i + 1]; rgb[j++] = data[i + 2];
+    }
+    return deflate(rgb).then(function (packed) {
+      return { bytes: packed, filter: '/FlateDecode', w: canvas.width, h: canvas.height };
+    });
+  }
+
+  function encodeJpeg(canvas) {
+    return new Promise(function (resolve, reject) {
+      canvas.toBlob(function (blob) {
+        if (!blob) { reject(new Error('Could not compress that image.')); return; }
+        blob.arrayBuffer().then(function (buf) {
+          resolve({ bytes: new Uint8Array(buf), filter: '/DCTDecode', w: canvas.width, h: canvas.height });
+        });
+      }, 'image/jpeg', 0.88);
+    });
+  }
+
+  function pdfDate(d) {
+    return 'D:' + d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) +
+           pad(d.getHours()) + pad(d.getMinutes()) + pad(d.getSeconds());
+  }
+
+  // images: [{bytes, filter, w, h}] — one per page, in order.
+  function buildPdf(images, pageMode) {
+    var objects = [];            // 1-based; objects[0] is object 1
+    var kids = [];
+
+    // 1 catalog, 2 pages — filled in after we know the kid numbers.
+    objects.push(null);
+    objects.push(null);
+
+    images.forEach(function (im) {
+      var pageNo = objects.length + 1;
+      var contentNo = pageNo + 1;
+      var imgNo = pageNo + 2;
+      kids.push(pageNo + ' 0 R');
+
+      var pw, ph, dw, dh, x, y;
+      if (pageMode === 'fit') {
+        // 1 image pixel = 0.75pt (96dpi), which keeps retina screenshots
+        // at a believable physical size.
+        pw = im.w * 0.75; ph = im.h * 0.75;
+        dw = pw; dh = ph; x = 0; y = 0;
+      } else {
+        var sheet = PAGES[pageMode] || PAGES.a4;
+        var landscape = im.w > im.h;
+        pw = landscape ? sheet[1] : sheet[0];
+        ph = landscape ? sheet[0] : sheet[1];
+        var availW = pw - MARGIN * 2, availH = ph - MARGIN * 2;
+        var s = Math.min(availW / im.w, availH / im.h);
+        dw = im.w * s; dh = im.h * s;
+        x = (pw - dw) / 2; y = (ph - dh) / 2;
+      }
+
+      var content = 'q ' + num(dw) + ' 0 0 ' + num(dh) + ' ' + num(x) + ' ' + num(y) + ' cm /Im0 Do Q\n';
+      var contentBytes = toBytes(content);
+
+      objects.push({
+        dict: '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ' + num(pw) + ' ' + num(ph) + ']' +
+              ' /Resources << /XObject << /Im0 ' + imgNo + ' 0 R >> >>' +
+              ' /Contents ' + contentNo + ' 0 R >>'
+      });
+      objects.push({
+        dict: '<< /Length ' + contentBytes.length + ' >>',
+        stream: contentBytes
+      });
+      objects.push({
+        dict: '<< /Type /XObject /Subtype /Image /Width ' + im.w + ' /Height ' + im.h +
+              ' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter ' + im.filter +
+              ' /Length ' + im.bytes.length + ' >>',
+        stream: im.bytes
+      });
+    });
+
+    objects[0] = { dict: '<< /Type /Catalog /Pages 2 0 R >>' };
+    objects[1] = { dict: '<< /Type /Pages /Kids [' + kids.join(' ') + '] /Count ' + images.length + ' >>' };
+
+    var infoNo = objects.length + 1;
+    objects.push({
+      dict: '<< /Producer (Screenshots to PDF) /CreationDate (' + pdfDate(new Date()) + ') >>'
+    });
+
+    // ---- serialize, tracking byte offsets for the xref table ----
+    var chunks = [], len = 0;
+    function put(d) {
+      var u = typeof d === 'string' ? toBytes(d) : d;
+      chunks.push(u); len += u.length;
+    }
+
+    put('%PDF-1.4\n');
+    put(new Uint8Array([0x25, 0xE2, 0xE3, 0xCF, 0xD3, 0x0A]));  // binary marker
+
+    var offsets = new Array(objects.length + 1);
+    objects.forEach(function (obj, i) {
+      offsets[i + 1] = len;
+      put((i + 1) + ' 0 obj\n');
+      put(obj.dict);
+      if (obj.stream) {
+        put('\nstream\n');
+        put(obj.stream);
+        put('\nendstream');
+      }
+      put('\nendobj\n');
+    });
+
+    var xrefAt = len;
+    var size = objects.length + 1;
+    var xref = 'xref\n0 ' + size + '\n0000000000 65535 f \n';
+    for (var i = 1; i < size; i++) {
+      xref += String(offsets[i]).padStart(10, '0') + ' 00000 n \n';
+    }
+    put(xref);
+    put('trailer\n<< /Size ' + size + ' /Root 1 0 R /Info ' + infoNo + ' 0 R >>\n' +
+        'startxref\n' + xrefAt + '\n%%EOF\n');
+
+    return new Blob(chunks, { type: 'application/pdf' });
+  }
+
+  /* ---------- export ---------- */
+
+  function cleanName(raw) {
+    var name = (raw || '').trim().replace(/\.pdf$/i, '').replace(/[\/\\:*?"<>|]/g, '-');
+    return (name || 'screenshots') + '.pdf';
+  }
+
+  function tick() { return new Promise(function (r) { setTimeout(r, 0); }); }
+
+  function humanSize(bytes) {
+    return bytes < 1024 * 1024
+      ? Math.round(bytes / 1024) + ' KB'
+      : (bytes / 1048576).toFixed(1) + ' MB';
+  }
+
+  ['fname', 'pagesize', 'quality'].forEach(function (id) {
+    $(id).addEventListener('input', function () {
+      if (!builtUrl) return;
+      discardBuild();
+      status.textContent = 'Settings changed — build the PDF again.';
+    });
+  });
+
+  dl.addEventListener('click', function () {
+    var saved = dl.download;
+    setTimeout(function () {
+      status.innerHTML = '';
+      var b = document.createElement('b');
+      b.textContent = saved;
+      status.append('Saved ', b, ' to your Downloads folder.');
+    }, 150);
+  });
+
+  save.addEventListener('click', function () {
+    if (busy || !items.length) return;
+
+    var usable = items.filter(function (it) { return it.ok && it.img; });
+    if (!usable.length) {
+      status.textContent = 'None of those images could be read. HEIC files need converting to PNG or JPEG first.';
+      return;
+    }
+    var skipped = items.length - usable.length;
+
+    busy = true;
+    save.disabled = true;
+    var lossless = $('quality').value === 'lossless' && typeof CompressionStream === 'function';
+    var pageMode = $('pagesize').value;
+    var encoded = [];
+
+    (function next(i) {
+      if (i >= usable.length) {
+        status.textContent = 'Writing PDF…';
+        return tick().then(function () {
+          var blob = buildPdf(encoded, pageMode);
+          var name = cleanName(fname.value);
+          builtUrl = URL.createObjectURL(blob);
+
+          // Browsers block downloads a script starts on its own, so the
+          // final save is a link the user clicks.
+          dl.href = builtUrl;
+          dl.download = name;
+          dl.textContent = '⤓  Save ' + name;
+          dl.hidden = false;
+          save.hidden = true;
+
+          busy = false;
+          save.disabled = false;
+          status.innerHTML = '';
+          var b = document.createElement('b');
+          b.textContent = usable.length + (usable.length === 1 ? ' page' : ' pages');
+          status.append('Ready — ', b, ', ' + humanSize(blob.size) +
+            (skipped ? ' · ' + skipped + ' unreadable image skipped' : ''));
+        });
+      }
+
+      status.textContent = 'Rendering page ' + (i + 1) + ' of ' + usable.length + '…';
+      return tick().then(function () {
+        var canvas = rasterize(usable[i].img);
+        return (lossless ? encodeLossless(canvas) : encodeJpeg(canvas));
+      }).then(function (im) {
+        encoded.push(im);
+        return next(i + 1);
+      });
+    })(0).catch(function (err) {
+      busy = false;
+      save.disabled = false;
+      status.textContent = 'Something went wrong while building the PDF: ' + err.message;
+    });
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
